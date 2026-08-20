@@ -8,6 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::asar;
+use crate::paths;
 use crate::process;
 use crate::skins;
 
@@ -187,6 +188,14 @@ pub fn install_flow(target: &Path, skin_id: &str) -> Result<String, FlowError> {
             return Err(FlowError::Fatal(format!("写回 app.asar 失败: {e}")));
         }
     }
+    // 持久化当前皮肤到 settings.json, 便于启动时快速判断状态、还原官方
+    if let Err(e) = paths::save_current_skin(Some(skin_id)) {
+        // 写入失败不影响应用结果, 仅记录到返回消息
+        return Ok(format!(
+            "已应用皮肤「{}」。(注: 更新 settings.json 失败: {e})",
+            skin.info.name
+        ));
+    }
     Ok(format!("已应用皮肤「{}」。", skin.info.name))
 }
 
@@ -206,7 +215,13 @@ pub fn restore_flow(target: &Path) -> Result<String, FlowError> {
         ));
     }
     match fs::rename(&backup, &asar) {
-        Ok(_) => Ok("已还原官方皮肤。".into()),
+        Ok(_) => {
+            // 清空当前皮肤记录
+            if let Err(e) = paths::save_current_skin(None) {
+                return Ok(format!("已还原官方皮肤。(注: 更新 settings.json 失败: {e})"));
+            }
+            Ok("已还原官方皮肤。".into())
+        }
         Err(e) if is_denied(&e) || is_locked(&e) => Err(denied_flow_error("还原 app.asar", &e)),
         Err(e) => Err(FlowError::Fatal(format!("还原失败: {e}"))),
     }

@@ -56,6 +56,23 @@ async fn import_skin_zip(path: String) -> Result<import::ImportOutcome, String> 
         .map_err(|e| e.to_string())?
 }
 
+/// 删除用户皮肤目录下的指定皮肤(官方原版不在皮肤目录中, 无法删除)。
+/// 不允许删除当前已应用的皮肤(需先恢复原版)。
+#[tauri::command]
+async fn delete_skin(id: String, target: Option<String>) -> Result<String, String> {
+    let t = target_from(target);
+    // 先检查是否为当前已应用的皮肤
+    let status = tauri::async_runtime::spawn_blocking(move || inject::status(&t))
+        .await
+        .map_err(|e| e.to_string())?;
+    if status.installed_skin_id.as_deref() == Some(id.as_str()) {
+        return Err("该皮肤正在使用中, 请先恢复原版再删除".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || skins::delete(&id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 async fn get_status(target: Option<String>) -> Result<inject::StatusInfo, String> {
     let t = target_from(target);
@@ -199,6 +216,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             list_skins,
             import_skin_zip,
+            delete_skin,
             get_status,
             get_settings,
             save_settings,

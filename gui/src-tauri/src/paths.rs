@@ -10,9 +10,21 @@ use crate::process;
 pub const DEFAULT_TARGET: &str = r"C:\Program Files\ZCode";
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     pub target_dir: String,
+    /// 当前应用的皮肤 id; None 表示未应用任何皮肤(官方原版)。
+    /// 每次应用/还原后由 inject 流程同步写入, 便于启动时快速判断当前状态。
+    pub current_skin: Option<String>,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            target_dir: DEFAULT_TARGET.to_string(),
+            current_skin: None,
+        }
+    }
 }
 
 /// 管理器数据目录: ~/.zcode-skins(不存在则自动创建, 并搬迁旧版数据)
@@ -59,6 +71,53 @@ pub fn user_skins_dir() -> PathBuf {
     app_data_dir().join("skins")
 }
 
+/// 把内置皮肤目录中缺失的皮肤种子化到用户皮肤目录(~/.zcode-skins/skins)。
+/// 首次启动(用户目录为空)时一次性铺开所有内置皮肤; 之后用户删除即永久删除,
+/// 不重新种子化(尊重用户选择)。后续应用更新新增的内置皮肤不会自动出现。
+pub fn ensure_builtin_skins_copied() {
+    let user_dir = user_skins_dir();
+    let _ = fs::create_dir_all(&user_dir);
+    // 用户目录已有皮肤 → 视为已初始化, 不再种子化(尊重用户的删除)
+    if dir_has_any_skin(&user_dir) {
+        return;
+    }
+    let Some(builtin) = builtin_skins_dir() else {
+        return;
+    };
+    let Ok(rd) = fs::read_dir(&builtin) else {
+        return;
+    };
+    for entry in rd.flatten() {
+        let src = entry.path();
+        if !src.is_dir() || !src.join("skin.json").is_file() {
+            continue;
+        }
+        let Some(id) = entry.file_name().to_str().map(str::to_string) else {
+            continue;
+        };
+        let dest = user_dir.join(&id);
+        if dest.exists() {
+            continue;
+        }
+        let _ = copy_dir_recursive(&src, &dest);
+    }
+}
+
+fn copy_dir_recursive(src: &Path, dest: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(dest)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dest_path = dest.join(entry.file_name());
+        if src_path.is_dir() {
+            copy_dir_recursive(&src_path, &dest_path)?;
+        } else {
+            let _ = fs::copy(&src_path, &dest_path);
+        }
+    }
+    Ok(())
+}
+
 fn settings_path() -> PathBuf {
     app_data_dir().join("settings.json")
 }
@@ -67,9 +126,12 @@ pub fn load_settings() -> Settings {
     fs::read_to_string(settings_path())
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or(Settings {
-            target_dir: DEFAULT_TARGET.to_string(),
-        })
+        .unwrap_or_default()
+}
+
+fn write_settings(settings: &Settings) -> Result<(), String> {
+    let text = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
+    fs::write(settings_path(), text).map_err(|e| format!("保存设置失败: {e}"))
 }
 
 pub fn save_settings(target_dir: &str) -> Result<Settings, String> {
@@ -77,12 +139,18 @@ pub fn save_settings(target_dir: &str) -> Result<Settings, String> {
     if dir.is_empty() {
         return Err("安装目录不能为空".into());
     }
-    let settings = Settings {
-        target_dir: dir.to_string(),
-    };
-    let text = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
-    fs::write(settings_path(), text).map_err(|e| format!("保存设置失败: {e}"))?;
-    Ok(settings)
+    let mut s = load_settings();
+    s.target_dir = dir.to_string();
+    write_settings(&s)?;
+    Ok(s)
+}
+
+/// 仅更新当前皮肤字段, 保留其它设置(target_dir 等)。
+/// 应用皮肤时传 Some(id), 还原官方时传 None。
+pub fn save_current_skin(skin_id: Option<&str>) -> Result<(), String> {
+    let mut s = load_settings();
+    s.current_skin = skin_id.map(|x| x.to_string());
+    write_settings(&s)
 }
 
 /// 解析目标安装目录: 显式参数 > 已保存设置 > 默认 Program Files

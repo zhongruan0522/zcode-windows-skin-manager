@@ -118,9 +118,19 @@ body {
 }
 
 /* ---------- 皮肤表格 ---------- */
+/* 列表区域最多显示 3 行(单行约 160px = 预览 132px + 行内边距 28px),
+   超出在区域内滚动; sticky th 在滚动时保持表头可见。 */
+.skin-table-wrap {
+  max-height: 482px;
+  overflow-y: auto;
+  border-top: 1px solid var(--line-strong);
+}
+
 .skin-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
 }
 
 .skin-table th {
@@ -130,6 +140,10 @@ body {
   padding: 8px 12px;
   border-bottom: 1px solid var(--line-strong);
   color: var(--ink);
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .skin-table td {
@@ -162,7 +176,13 @@ body {
   width: 100px;
 }
 
+.col-action {
+  width: 88px;
+  text-align: center;
+}
+
 .cell-name {
+  width: auto;
   min-width: 200px;
 }
 
@@ -262,6 +282,16 @@ body {
   background: #000;
 }
 
+.btn-danger {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--bg);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
 .btn:disabled {
   opacity: 0.45;
   cursor: default;
@@ -285,6 +315,12 @@ body {
 .badge-muted {
   border-color: var(--line);
   color: var(--ink-sub);
+}
+
+/* ---------- 操作列占位 ---------- */
+.action-placeholder {
+  color: var(--ink-sub);
+  font-size: 14px;
 }
 
 /* ---------- 详情弹窗 ---------- */

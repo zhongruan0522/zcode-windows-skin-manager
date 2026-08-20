@@ -107,9 +107,9 @@ export default function SettingsView({ targetDir, onSaved }: Props) {
       <section className="settings-item">
         <h3>皮肤目录</h3>
         <p className="settings-hint">
-          内置皮肤随应用提供；自定义皮肤放入{" "}
-          <code>%APPDATA%\zcode-skin-manager\skins\&lt;皮肤id&gt;\</code>
-          （须包含 skin.json 与 skin.css），与内置皮肤同名时优先使用用户目录的版本。
+          所有皮肤(含内置)统一存放在 <code>%USERPROFILE%\.zcode-skins\skins\&lt;皮肤id&gt;\</code>
+          ，首次启动时自动从应用包种子化内置皮肤。皮肤目录须包含 skin.json 与 skin.css；
+          可在皮肤列表中删除非官方原版的皮肤(已应用的需先恢复原版)，或通过「导入 ZIP」添加新皮肤。
         </p>
       </section>
 

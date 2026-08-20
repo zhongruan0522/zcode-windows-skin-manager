@@ -81,6 +81,55 @@ fn scan_dir(base: &Path, source: &str, out: &mut Vec<SkinPackage>) {
     }
 }
 
+/// 列出内置皮肤目录下的所有 id(仅用于 source 标记, 不读取内容)
+fn builtin_ids() -> std::collections::HashSet<String> {
+    let mut out = std::collections::HashSet::new();
+    let Some(b) = paths::builtin_skins_dir() else {
+        return out;
+    };
+    let Ok(rd) = fs::read_dir(&b) else {
+        return out;
+    };
+    for entry in rd.flatten() {
+        let p = entry.path();
+        if p.is_dir() && p.join("skin.json").is_file() {
+            if let Some(name) = entry.file_name().to_str() {
+                out.insert(name.to_string());
+            }
+        }
+    }
+    out
+}
+
+/// 删除用户皮肤目录下的指定皮肤; 不允许删除内置皮肤源目录(本函数只动用户目录)。
+/// 返回被删除皮肤的友好名称(供前端展示)。
+pub fn delete(id: &str) -> Result<String, String> {
+    if !valid_skin_id(id) {
+        return Err("皮肤 id 非法".into());
+    }
+    let dir = paths::user_skins_dir().join(id);
+    if !dir.is_dir() {
+        return Err(format!("皮肤「{id}」不存在, 可能已被删除"));
+    }
+    // 取名称用于返回, 取不到就用 id
+    let name = fs::read_to_string(dir.join("skin.json"))
+        .ok()
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        .and_then(|v| v.get("name").and_then(|n| n.as_str()).map(str::to_string))
+        .unwrap_or_else(|| id.to_string());
+    fs::remove_dir_all(&dir).map_err(|e| format!("删除皮肤「{name}」失败: {e}"))?;
+    Ok(name)
+}
+
+fn valid_skin_id(id: &str) -> bool {
+    !id.is_empty()
+        && id != "."
+        && id != ".."
+        && !id
+            .chars()
+            .any(|c| matches!(c, '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
+}
+
 fn read_preview(dir: &Path, declared: Option<&str>) -> Option<String> {
     let mut cands: Vec<PathBuf> = Vec::new();
     if let Some(d) = declared {
@@ -112,14 +161,21 @@ fn read_preview(dir: &Path, declared: Option<&str>) -> Option<String> {
     None
 }
 
-/// 扫描内置 + 用户皮肤目录; 同 id 时用户目录覆盖内置
+/// 扫描用户皮肤目录(~/.zcode-skins/skins, 内置皮肤已种子化到此);
+/// source 字段按 id 是否出现在内置皮肤目录中标记 builtin / user。
 pub fn scan_all() -> Vec<SkinPackage> {
+    // 先确保内置皮肤已种子化(首次启动时一次性铺开, 之后早退)
+    paths::ensure_builtin_skins_copied();
+    let builtin = builtin_ids();
     let mut list: Vec<SkinPackage> = Vec::new();
-    if let Some(b) = paths::builtin_skins_dir() {
-        scan_dir(&b, "builtin", &mut list);
-    }
     scan_dir(&paths::user_skins_dir(), "user", &mut list);
-
+    // 根据 id 是否在内置目录中改写 source
+    for pkg in list.iter_mut() {
+        if builtin.contains(&pkg.info.id) {
+            pkg.info.source = "builtin".to_string();
+        }
+    }
+    // 按 id 排序, 保证列表顺序稳定
     let mut by_id: BTreeMap<String, SkinPackage> = BTreeMap::new();
     for pkg in list {
         by_id.insert(pkg.info.id.clone(), pkg);

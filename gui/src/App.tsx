@@ -125,6 +125,24 @@ export default function App() {
     })();
   }, [confirmPending, runAction]);
 
+  /** 删除一个皮肤(官方行不可删除, 已应用的需先恢复) */
+  const handleDelete = useCallback(async (id: string) => {
+    const skin = skins.find((s) => s.id === id);
+    const name = skin?.name ?? id;
+    if (!window.confirm(`确认从皮肤列表中删除「${name}」?\n(皮肤目录文件会被删除, ZCode 安装目录不会被改动)`)) {
+      return;
+    }
+    setError(null);
+    setMessage(null);
+    try {
+      const deletedName = await api.deleteSkin(id);
+      setSkins(await api.listSkins());
+      setMessage(`已删除皮肤「${deletedName}」。`);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [skins]);
+
   /** 右上角「导入 ZIP」: 弹出文件选择框(.zip) -> 后端校验导入 -> 刷新列表 */
   const handleImport = useCallback(async () => {
     if (importing || busy) return;
@@ -238,6 +256,7 @@ export default function App() {
             onApply={handleApply}
             onRestore={handleRestore}
             onDetail={setDetailId}
+            onDelete={handleDelete}
           />
         ) : (
           <SettingsView targetDir={targetDir} onSaved={handleSaveSettings} />

@@ -25,6 +25,8 @@ export interface StatusInfo {
 
 export interface Settings {
   targetDir: string;
+  /** 当前应用的皮肤 id; null 表示未应用任何皮肤(官方原版)。每次换肤/还原后由后端同步写入。 */
+  currentSkin: string | null;
 }
 
 /** 自动检测到的一个 ZCode 安装目录 */
@@ -133,8 +135,12 @@ const mock = (() => {
     },
     getSettings: async (): Promise<Settings> => ({
       targetDir: "C:\\Program Files\\ZCode",
+      currentSkin: installed,
     }),
-    saveSettings: async (targetDir: string): Promise<Settings> => ({ targetDir }),
+    saveSettings: async (targetDir: string): Promise<Settings> => ({
+      targetDir,
+      currentSkin: installed,
+    }),
     detectInstalls: async (): Promise<DetectedInstall[]> => {
       await delay(400);
       return [
@@ -154,6 +160,15 @@ const mock = (() => {
       await delay(900);
       installed = null;
       return { message: "已还原官方 app.asar (模拟)", status: status() };
+    },
+    deleteSkin: async (id: string): Promise<string> => {
+      await delay(400);
+      const idx = skins.findIndex((s) => s.id === id);
+      if (idx < 0) throw new Error("皮肤不存在(模拟)");
+      if (installed === id) throw new Error("该皮肤正在使用中, 请先恢复原版再删除(模拟)");
+      const name = skins[idx].name;
+      skins.splice(idx, 1);
+      return name;
     },
     zcodeRunning: async (): Promise<boolean> => {
       await delay(300);
@@ -191,6 +206,8 @@ export const api = hasTauri
         invoke("install_skin", { id, target: target ?? null }),
       restoreSkin: (target?: string): Promise<ActionOutcome> =>
         invoke("restore_skin", { target: target ?? null }),
+      deleteSkin: (id: string, target?: string): Promise<string> =>
+        invoke("delete_skin", { id, target: target ?? null }),
       zcodeRunning: (target?: string): Promise<boolean> =>
         invoke("zcode_running", { target: target ?? null }),
       launchZcode: (target?: string): Promise<void> =>

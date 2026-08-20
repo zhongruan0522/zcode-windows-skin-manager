@@ -11,6 +11,7 @@ interface Props {
   onApply: (id: string) => void;
   onRestore: () => void;
   onDetail: (id: string) => void;
+  onDelete: (id: string) => void;
 }
 
 export default function SkinCard({
@@ -21,6 +22,7 @@ export default function SkinCard({
   onApply,
   onRestore,
   onDetail,
+  onDelete,
 }: Props) {
   const disabled = busy !== null;
   const applyBusy = busy?.kind === "install" && busy.id === row.id;
@@ -72,6 +74,20 @@ export default function SkinCard({
           <span className="badge">使用中</span>
         ) : (
           <span className="badge badge-muted">未使用</span>
+        )}
+      </td>
+      <td className="col-action">
+        {row.official ? (
+          <span className="action-placeholder">—</span>
+        ) : (
+          <button
+            className="btn btn-danger"
+            disabled={disabled || inUse}
+            title={inUse ? "请先恢复原版再删除" : "从皮肤列表中删除该皮肤"}
+            onClick={() => onDelete(row.id)}
+          >
+            删除
+          </button>
         )}
       </td>
     </tr>

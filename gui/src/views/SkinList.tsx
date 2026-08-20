@@ -21,6 +21,7 @@ interface Props {
   onApply: (id: string) => void;
   onRestore: () => void;
   onDetail: (id: string) => void;
+  onDelete: (id: string) => void;
 }
 
 export default function SkinList({
@@ -30,6 +31,7 @@ export default function SkinList({
   onApply,
   onRestore,
   onDetail,
+  onDelete,
 }: Props) {
   const installedId = status?.installedSkinId ?? null;
   const installedAny = installedId !== null;
@@ -59,30 +61,34 @@ export default function SkinList({
   ];
 
   return (
-    <table className="skin-table">
-      <thead>
-        <tr>
-          <th className="col-preview">预览</th>
-          <th>皮肤</th>
-          <th className="col-meta">作者</th>
-          <th className="col-meta">版本</th>
-          <th className="col-status">状态</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <SkinCard
-            key={row.id}
-            row={row}
-            inUse={row.official ? !installedAny : installedId === row.id}
-            installedAny={installedAny}
-            busy={busy}
-            onApply={onApply}
-            onRestore={onRestore}
-            onDetail={onDetail}
-          />
-        ))}
-      </tbody>
-    </table>
+    <div className="skin-table-wrap">
+      <table className="skin-table">
+        <thead>
+          <tr>
+            <th className="col-preview">预览</th>
+            <th>皮肤</th>
+            <th className="col-meta">作者</th>
+            <th className="col-meta">版本</th>
+            <th className="col-status">状态</th>
+            <th className="col-action">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <SkinCard
+              key={row.id}
+              row={row}
+              inUse={row.official ? !installedAny : installedId === row.id}
+              installedAny={installedAny}
+              busy={busy}
+              onApply={onApply}
+              onRestore={onRestore}
+              onDetail={onDetail}
+              onDelete={onDelete}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
