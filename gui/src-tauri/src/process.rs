@@ -1,5 +1,6 @@
-//! ZCode 进程检测, 移植自 liquid_glass_skin.py 的 zcode_running_under:
-//! 只检测"目标目录下"的 ZCode.exe 是否在运行（其他目录的实例不占用目标的 asar）。
+//! ZCode 进程检测与启动。检测部分移植自 liquid_glass_skin.py 的
+//! zcode_running_under: 只检测"目标目录下"的 ZCode.exe 是否在运行
+//! （其他目录的实例不占用目标的 asar）。
 
 use std::path::Path;
 use std::process::Command;
@@ -64,6 +65,24 @@ pub(crate) fn normalize_str(p: &str) -> String {
 
 fn strip_verbatim(s: String) -> String {
     s.strip_prefix(r"\\?\").map(str::to_string).unwrap_or(s)
+}
+
+/// 启动目标目录下的 ZCode.exe(分离进程, 不等待其退出)。
+/// 本应用以管理员身份运行时, 拉起的 ZCode 会继承管理员权限——
+/// 写入 Program Files 的安装目录本就要求管理员, 属预期行为。
+pub fn launch_zcode(target_dir: &Path) -> Result<(), String> {
+    let exe = target_dir.join("ZCode.exe");
+    if !exe.is_file() {
+        return Err(format!(
+            "找不到 {}, 请在「设置」中确认 ZCode 安装目录。",
+            exe.display()
+        ));
+    }
+    Command::new(&exe)
+        .current_dir(target_dir)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("启动 ZCode 失败: {e}"))
 }
 
 #[cfg(test)]

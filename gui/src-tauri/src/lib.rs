@@ -150,6 +150,16 @@ async fn zcode_running(target: Option<String>) -> Result<bool, String> {
         .map_err(|e| e.to_string())
 }
 
+/// 启动目标目录下的 ZCode 桌面版(分离进程, 不等待其退出)。
+/// 应用/还原成功后由前端弹窗倒计时确认调用。
+#[tauri::command]
+async fn launch_zcode(target: Option<String>) -> Result<(), String> {
+    let t = target_from(target);
+    tauri::async_runtime::spawn_blocking(move || process::launch_zcode(&t))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 pub fn run() {
     // 提权子进程模式: 无 GUI, 只执行 install/restore 后退出
     if let Some(code) = elevate::maybe_run_elevated_cli() {
@@ -182,7 +192,8 @@ pub fn run() {
             detect_installs,
             install_skin,
             restore_skin,
-            zcode_running
+            zcode_running,
+            launch_zcode
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

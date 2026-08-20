@@ -128,6 +128,10 @@ const mock = (() => {
       // 浏览器调试: URL 井号带 zcode-running 时模拟 ZCode 正在运行
       return location.hash.includes("zcode-running");
     },
+    launchZcode: async (): Promise<void> => {
+      await delay(400);
+      console.info("[mock] 启动 ZCode.exe");
+    },
   };
 })();
 
@@ -146,5 +150,7 @@ export const api = hasTauri
         invoke("restore_skin", { target: target ?? null }),
       zcodeRunning: (target?: string): Promise<boolean> =>
         invoke("zcode_running", { target: target ?? null }),
+      launchZcode: (target?: string): Promise<void> =>
+        invoke("launch_zcode", { target: target ?? null }),
     }
   : mock;

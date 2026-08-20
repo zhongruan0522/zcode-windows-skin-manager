@@ -167,10 +167,7 @@ pub fn install_flow(target: &Path, skin_id: &str) -> Result<String, FlowError> {
             return Err(FlowError::Fatal(format!("写回 app.asar 失败: {e}")));
         }
     }
-    Ok(format!(
-        "已应用皮肤「{}」, 完全重启 ZCode 桌面版后生效。",
-        skin.info.name
-    ))
+    Ok(format!("已应用皮肤「{}」。", skin.info.name))
 }
 
 /// 还原官方 app.asar（用备份覆盖, 备份随之移除）
@@ -189,7 +186,7 @@ pub fn restore_flow(target: &Path) -> Result<String, FlowError> {
         ));
     }
     match fs::rename(&backup, &asar) {
-        Ok(_) => Ok("已还原官方 app.asar, 重启 ZCode 即恢复原皮肤。".into()),
+        Ok(_) => Ok("已还原官方皮肤。".into()),
         Err(e) if is_denied(&e) => Err(FlowError::NeedElevate(
             "还原 app.asar 需要管理员权限".into(),
         )),

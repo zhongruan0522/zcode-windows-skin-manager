@@ -419,6 +419,11 @@ body {
   color: var(--danger);
 }
 
+.dialog-hint {
+  margin-top: 10px;
+  color: var(--ink-sub);
+}
+
 .dialog-foot {
   display: flex;
   align-items: center;

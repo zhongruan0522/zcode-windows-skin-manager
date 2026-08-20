@@ -5,6 +5,7 @@ import SettingsView from "./views/Settings";
 import StatusBar from "./components/StatusBar";
 import PreviewModal from "./components/PreviewModal";
 import ZCodeRunningDialog from "./components/ZCodeRunningDialog";
+import LaunchZCodeDialog from "./components/LaunchZCodeDialog";
 
 type View = "skins" | "settings";
 
@@ -24,6 +25,8 @@ export default function App() {
   const [confirmChecking, setConfirmChecking] = useState(false);
   /** 复查后仍检测到 ZCode 在运行 */
   const [stillRunning, setStillRunning] = useState(false);
+  /** 应用/还原成功后待确认的「立即打开 ZCode」消息 */
+  const [launchPending, setLaunchPending] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -47,8 +50,9 @@ export default function App() {
         action.kind === "install"
           ? await api.installSkin(action.id)
           : await api.restoreSkin();
-      setMessage(out.message);
       setStatus(out.status);
+      // 成功后不再直接出横幅, 弹窗询问是否立即打开 ZCode
+      setLaunchPending(out.message);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -127,6 +131,24 @@ export default function App() {
       setError(String(e));
     }
   }, []);
+
+  /** 成功弹窗「取消」: 不打开 ZCode, 成功消息回落到横幅展示 */
+  const handleLaunchCancel = useCallback(() => {
+    setMessage(launchPending);
+    setLaunchPending(null);
+  }, [launchPending]);
+
+  /** 成功弹窗「打开」或倒计时结束: 启动 ZCode 桌面版 */
+  const handleLaunchZcode = useCallback(async () => {
+    const msg = launchPending ?? "";
+    setLaunchPending(null);
+    try {
+      await api.launchZcode();
+      setMessage(`${msg}已启动 ZCode 桌面版。`);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [launchPending]);
 
   const detailSkin =
     detailId && detailId !== "official"
@@ -217,6 +239,14 @@ export default function App() {
           checking={confirmChecking}
           onCancel={handleConfirmCancel}
           onConfirmClosed={handleConfirmClosed}
+        />
+      )}
+
+      {launchPending && (
+        <LaunchZCodeDialog
+          message={launchPending}
+          onCancel={handleLaunchCancel}
+          onLaunch={handleLaunchZcode}
         />
       )}
     </div>
