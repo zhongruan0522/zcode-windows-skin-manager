@@ -1,0 +1,54 @@
+/* ============================================================
+ * 纯透明测试皮肤 —— 验证注入链路是否生效
+ * 所有页面/面板/卡片/弹层背景一律 transparent,
+ * 关掉毛玻璃和投影, 文字和边框保留以便辨认布局。
+ * 如果注入有效: 整个应用背景会变成 Electron 窗口的原始底色
+ * (通常是一块纯色), 所有面板只剩文字和边框"悬空"显示。
+ * ============================================================ */
+
+/* 窗口底也透明(覆盖液态玻璃皮肤的极光背景) */
+html,
+html.dark,
+body,
+html.dark body {
+  background: transparent !important;
+}
+
+/* 所有语义背景 token -> 透明 */
+:root,
+.dark {
+  --color-background: transparent;
+  --color-background-alt: transparent;
+  --color-background-win-alt: transparent;
+  --color-header: transparent;
+  --color-panel: transparent;
+  --color-sidebar: transparent;
+  --color-card: transparent;
+  --color-card-selected: transparent;
+  --color-popover: transparent;
+  --color-popover-header: transparent;
+  --color-input: transparent;
+  --color-input-focused: transparent;
+  --color-surface: transparent;
+  --color-surface-hover: transparent;
+  --color-terminal-bg: transparent;
+  --color-hover: transparent;
+  --color-selected: transparent;
+}
+
+/* bg-* 工具类兜底: 强制透明 + 去掉毛玻璃/投影 */
+.bg-background, .bg-panel, .bg-sidebar, .bg-header,
+.bg-card, .bg-popover, .bg-input, .bg-surface, .bg-terminal-bg {
+  background-color: transparent !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+/* 少数直接写死的 Tailwind 字面色也一并透明, 保证测试彻底 */
+.bg-white, .bg-black,
+.bg-neutral-50, .bg-neutral-100, .bg-neutral-200, .bg-neutral-300,
+.bg-neutral-700, .bg-neutral-800, .bg-neutral-900, .bg-neutral-950,
+.bg-zinc-800, .bg-zinc-900, .bg-slate-800, .bg-slate-900 {
+  background-color: transparent !important;
+}
