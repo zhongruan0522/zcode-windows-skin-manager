@@ -146,6 +146,11 @@ pub fn run() {
     if let Some(code) = elevate::maybe_run_elevated_cli() {
         std::process::exit(code);
     }
+    // 启动时自我提权: 非管理员实例自动以管理员身份重启, 避免用户忘记
+    // "以管理员身份运行"导致对 ZCode 安装目录的写入被拒
+    if elevate::relaunch_as_admin_if_needed() {
+        std::process::exit(0);
+    }
     tauri::Builder::default()
         .on_window_event(|window, event| {
             // 关闭主窗口 = 隐藏到托盘继续驻留, 真正退出走托盘菜单"退出"

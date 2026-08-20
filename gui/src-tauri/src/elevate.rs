@@ -35,6 +35,64 @@ mod imp {
         unsafe { IsUserAnAdmin() != 0 }
     }
 
+    /// 启动时自我提权: 当前非管理员时用 runas 以管理员身份重新拉起自身
+    /// （保留原命令行参数）, 随后调用方应退出本进程。
+    /// 返回 true 表示需要退出当前进程（提权重启成功 / 用户取消 / 请求失败）；
+    /// 返回 false 表示无需提权（已是管理员）。
+    pub fn relaunch_as_admin_if_needed() -> bool {
+        if is_admin() {
+            return false;
+        }
+        let exe = match std::env::current_exe() {
+            Ok(p) => p,
+            Err(_) => return false,
+        };
+        // 收集原参数并做 Windows 命令行转义, 避免路径含空格/引号时丢失
+        let args: Vec<String> = std::env::args().skip(1).collect();
+        let mut cmdline = String::new();
+        for a in &args {
+            if a.contains(' ') || a.contains('"') {
+                cmdline.push('"');
+                cmdline.push_str(&a.replace('"', "\"\""));
+                cmdline.push('"');
+            } else {
+                cmdline.push_str(a);
+            }
+            cmdline.push(' ');
+        }
+
+        let verb = wide("runas");
+        let file = wide(&exe.to_string_lossy());
+        let params = wide(&cmdline);
+        let mut sei: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
+        sei.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
+        sei.lpVerb = verb.as_ptr();
+        sei.lpFile = file.as_ptr();
+        sei.lpParameters = params.as_ptr();
+        sei.nShow = SW_SHOWNORMAL;
+
+        let ok = unsafe { ShellExecuteExW(&mut sei) };
+        if ok == 0 {
+            let err = unsafe { GetLastError() };
+            let msg = if err == ERROR_CANCELLED {
+                "需要管理员权限才能修改 ZCode 安装目录, 程序将退出。".to_string()
+            } else {
+                format!("请求管理员权限失败 (错误码 {err}), 程序将退出。")
+            };
+            let caption = wide("ZCode 皮肤管理器");
+            let text = wide(&msg);
+            unsafe {
+                MessageBoxW(
+                    std::ptr::null_mut(),
+                    text.as_ptr(),
+                    caption.as_ptr(),
+                    MB_OK | MB_ICONERROR,
+                );
+            }
+        }
+        true
+    }
+
     fn wide(s: &str) -> Vec<u16> {
         s.encode_utf16().chain(std::iter::once(0)).collect()
     }
@@ -192,6 +250,10 @@ mod imp {
         false
     }
 
+    pub fn relaunch_as_admin_if_needed() -> bool {
+        false
+    }
+
     pub fn elevate_and_wait(
         _command: &str,
         _skin_id: Option<&str>,
@@ -205,4 +267,4 @@ mod imp {
     }
 }
 
-pub use imp::{elevate_and_wait, is_admin, maybe_run_elevated_cli};
+pub use imp::{elevate_and_wait, is_admin, maybe_run_elevated_cli, relaunch_as_admin_if_needed};
