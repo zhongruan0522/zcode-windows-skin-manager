@@ -27,6 +27,8 @@ export default function App() {
   const [stillRunning, setStillRunning] = useState(false);
   /** 应用/还原成功后待确认的「立即打开 ZCode」消息 */
   const [launchPending, setLaunchPending] = useState<string | null>(null);
+  /** 正在导入 ZIP 皮肤包 */
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -123,6 +125,31 @@ export default function App() {
     })();
   }, [confirmPending, runAction]);
 
+  /** 右上角「导入 ZIP」: 弹出文件选择框(.zip) -> 后端校验导入 -> 刷新列表 */
+  const handleImport = useCallback(async () => {
+    if (importing || busy) return;
+    let path: string | null;
+    try {
+      path = await api.pickSkinZip();
+    } catch (e) {
+      setError(String(e));
+      return;
+    }
+    if (!path) return; // 用户取消选择
+    setImporting(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const out = await api.importSkinZip(path);
+      setSkins(await api.listSkins());
+      setMessage(out.message);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setImporting(false);
+    }
+  }, [importing, busy]);
+
   const handleSaveSettings = useCallback(async (dir: string) => {
     setTargetDir(dir);
     try {
@@ -173,6 +200,16 @@ export default function App() {
             设置
           </button>
         </nav>
+        <div className="header-actions">
+          <button
+            className="btn btn-solid"
+            onClick={handleImport}
+            disabled={importing || busy !== null}
+            title="从 ZIP 压缩包导入皮肤（skins/皮肤目录 或 名称/skins/皮肤目录）"
+          >
+            {importing ? "导入中…" : "导入 ZIP"}
+          </button>
+        </div>
       </header>
 
       <main className="app-main">

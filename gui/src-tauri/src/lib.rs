@@ -3,12 +3,15 @@
 //! asar.rs(asar 读写) / inject.rs(注入还原状态) / skins.rs(皮肤扫描) /
 //! elevate.rs(UAC 提权) / process.rs(进程检测) / paths.rs(路径与设置)。
 //! tray.rs 为 GUI 附加的系统托盘（后台驻留）。
+//! import.rs 为 ZIP 皮肤包导入（GUI 新增, Python 版无对应物）。
 
 // 内部实现模块, pub 仅为支持 tests/ 集成测试, 不属于对外 API
 #[doc(hidden)]
 pub mod asar;
 #[doc(hidden)]
 pub mod elevate;
+#[doc(hidden)]
+pub mod import;
 #[doc(hidden)]
 pub mod inject;
 #[doc(hidden)]
@@ -43,6 +46,14 @@ async fn list_skins() -> Result<Vec<skins::SkinInfo>, String> {
     tauri::async_runtime::spawn_blocking(skins::list_infos)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// 导入 ZIP 皮肤包到用户皮肤目录(~/.zcode-skins/skins, 自动创建)
+#[tauri::command]
+async fn import_skin_zip(path: String) -> Result<import::ImportOutcome, String> {
+    tauri::async_runtime::spawn_blocking(move || import::import_zip(std::path::Path::new(&path)))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -171,6 +182,7 @@ pub fn run() {
         std::process::exit(0);
     }
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .on_window_event(|window, event| {
             // 关闭主窗口 = 隐藏到托盘继续驻留, 真正退出走托盘菜单"退出"
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -186,6 +198,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_skins,
+            import_skin_zip,
             get_status,
             get_settings,
             save_settings,

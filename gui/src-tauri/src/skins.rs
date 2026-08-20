@@ -1,6 +1,6 @@
 //! 皮肤包扫描与校验。规范见根目录 AGENTS.md:
 //! skins/<skin-id>/{skin.json(必需), skin.css(必需), preview.png(推荐), assets/(可选)}。
-//! 内置目录 + 用户目录(%APPDATA%\zcode-skin-manager\skins)合并, 同名用户优先。
+//! 内置目录 + 用户目录(~/.zcode-skins/skins)合并, 同名用户优先。
 
 use base64::Engine;
 use serde::Serialize;

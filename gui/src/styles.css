@@ -76,6 +76,13 @@ body {
   border-bottom-color: var(--line-strong);
 }
 
+/* 顶栏右侧操作区 */
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
 /* ---------- 主区域 ---------- */
 .app-main {
   flex: 1;

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 
 // 与 Rust 侧 DTO 对齐（均为 camelCase 序列化）
 
@@ -42,6 +43,18 @@ export interface ActionOutcome {
 export interface BusyAction {
   kind: "install" | "restore";
   id: string;
+}
+
+/** 导入成功的一个皮肤 */
+export interface ImportedSkin {
+  id: string;
+  name: string;
+}
+
+/** ZIP 导入结果: 导入的皮肤列表 + 汇总消息 */
+export interface ImportOutcome {
+  skins: ImportedSkin[];
+  message: string;
 }
 
 const hasTauri =
@@ -95,6 +108,25 @@ const mock = (() => {
       await delay(200);
       return skins;
     },
+    // 浏览器调试: 用隐藏 input 模拟文件选择(仅能拿到文件名; 取消时不返回)
+    pickSkinZip: async (): Promise<string | null> =>
+      new Promise((resolve) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".zip,.ZIP";
+        input.onchange = () => resolve(input.files?.[0]?.name ?? null);
+        input.click();
+      }),
+    importSkinZip: async (path: string): Promise<ImportOutcome> => {
+      await delay(600);
+      const id = `zip-${Date.now()}`;
+      const name = `ZIP 导入: ${path}`;
+      skins.push(mk(id, name, "从压缩包导入的模拟皮肤", "#9fd3c7"));
+      return {
+        skins: [{ id, name }],
+        message: `已导入压缩包「${path}」中的皮肤（模拟）`,
+      };
+    },
     getStatus: async (): Promise<StatusInfo> => {
       await delay(100);
       return status();
@@ -138,6 +170,17 @@ const mock = (() => {
 export const api = hasTauri
   ? {
       listSkins: (): Promise<SkinInfo[]> => invoke("list_skins"),
+      /** 弹出系统文件选择框, 仅允许选择 .zip; 取消返回 null */
+      pickSkinZip: async (): Promise<string | null> => {
+        const picked = await open({
+          multiple: false,
+          title: "选择皮肤压缩包",
+          filters: [{ name: "皮肤压缩包 (*.zip)", extensions: ["zip", "ZIP"] }],
+        });
+        return typeof picked === "string" ? picked : null;
+      },
+      importSkinZip: (path: string): Promise<ImportOutcome> =>
+        invoke("import_skin_zip", { path }),
       getStatus: (target?: string): Promise<StatusInfo> =>
         invoke("get_status", { target: target ?? null }),
       getSettings: (): Promise<Settings> => invoke("get_settings"),

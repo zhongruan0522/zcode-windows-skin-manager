@@ -1,5 +1,5 @@
 //! 路径解析: 安装目录设置 / 内置与用户皮肤目录 / ZCode 安装目录自动检测。
-//! 设置持久化在 %APPDATA%\zcode-skin-manager\settings.json。
+//! 管理器数据统一存放在 ~/.zcode-skins/(设置与用户皮肤), 首次使用时自动创建。
 
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -15,14 +15,44 @@ pub struct Settings {
     pub target_dir: String,
 }
 
+/// 管理器数据目录: ~/.zcode-skins(不存在则自动创建, 并搬迁旧版数据)
 pub fn app_data_dir() -> PathBuf {
-    let base = std::env::var_os("APPDATA")
+    let home = std::env::var_os("USERPROFILE")
+        .or_else(|| std::env::var_os("HOME"))
         .map(PathBuf::from)
-        .or_else(|| std::env::var_os("USERPROFILE").map(PathBuf::from))
         .unwrap_or_else(|| PathBuf::from("."));
-    let dir = base.join("zcode-skin-manager");
+    let dir = home.join(".zcode-skins");
     let _ = fs::create_dir_all(&dir);
+    migrate_legacy_appdata(&dir);
     dir
+}
+
+/// 旧版数据目录(%APPDATA%\zcode-skin-manager)的一次性搬迁:
+/// settings.json 与 skins/ 下已导入的皮肤移入新目录, 新目录已有的内容不覆盖。
+fn migrate_legacy_appdata(new_dir: &Path) {
+    let Some(appdata) = std::env::var_os("APPDATA").map(PathBuf::from) else {
+        return;
+    };
+    let old = appdata.join("zcode-skin-manager");
+    if !old.is_dir() {
+        return;
+    }
+    let old_settings = old.join("settings.json");
+    if old_settings.is_file() && !new_dir.join("settings.json").is_file() {
+        let _ = fs::copy(&old_settings, new_dir.join("settings.json"));
+    }
+    let old_skins = old.join("skins");
+    if old_skins.is_dir() {
+        if let Ok(rd) = fs::read_dir(&old_skins) {
+            for entry in rd.flatten() {
+                let dest = new_dir.join("skins").join(entry.file_name());
+                if !dest.exists() {
+                    // 同盘 rename; 失败(如跨盘)则放弃, 用户重新导入即可
+                    let _ = fs::rename(entry.path(), &dest);
+                }
+            }
+        }
+    }
 }
 
 pub fn user_skins_dir() -> PathBuf {
