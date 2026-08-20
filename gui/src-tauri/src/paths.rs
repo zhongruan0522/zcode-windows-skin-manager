@@ -71,14 +71,21 @@ pub fn user_skins_dir() -> PathBuf {
     app_data_dir().join("skins")
 }
 
-/// 把内置皮肤目录中缺失的皮肤种子化到用户皮肤目录(~/.zcode-skins/skins)。
-/// 首次启动(用户目录为空)时一次性铺开所有内置皮肤; 之后用户删除即永久删除,
-/// 不重新种子化(尊重用户选择)。后续应用更新新增的内置皮肤不会自动出现。
+/// 把内置皮肤目录中的皮肤种子化到用户皮肤目录(~/.zcode-skins/skins)。
+/// 首次启动(用户目录不存在)时创建目录并一次性铺开所有内置皮肤; 之后用户
+/// 删除即永久删除, 不重新种子化(尊重用户选择)。后续应用更新新增的内置皮肤
+/// 不会自动出现。
+///
+/// 注意: 用"目录已存在"作为已初始化判据, 而不是"目录非空"。否则用户把皮肤
+/// 删到目录变空时, 下次刷新会触发重新种子化把所有内置皮肤恢复, 看起来就像
+/// "删不掉、刷新后又回来了"。
 pub fn ensure_builtin_skins_copied() {
     let user_dir = user_skins_dir();
-    let _ = fs::create_dir_all(&user_dir);
-    // 用户目录已有皮肤 → 视为已初始化, 不再种子化(尊重用户的删除)
-    if dir_has_any_skin(&user_dir) {
+    // 用户目录已存在 → 视为已初始化, 不再种子化(尊重用户的删除)
+    if user_dir.is_dir() {
+        return;
+    }
+    if fs::create_dir_all(&user_dir).is_err() {
         return;
     }
     let Some(builtin) = builtin_skins_dir() else {
@@ -96,9 +103,6 @@ pub fn ensure_builtin_skins_copied() {
             continue;
         };
         let dest = user_dir.join(&id);
-        if dest.exists() {
-            continue;
-        }
         let _ = copy_dir_recursive(&src, &dest);
     }
 }
