@@ -73,6 +73,24 @@ skins/
 - 用 `!important` 兜底 Tailwind 工具类是允许的（注入的样式优先级必须压过原生的）
 - 需要同时覆盖 `:root` 和 `.dark` 两个作用域（明暗两套主题）
 
+## Commit 规范
+
+所有提交遵循 Conventional Commits 格式：`type(scope): 主题`，主题用中文简述改动内容。
+如有必要，正文用 `- xxx` 列表逐条说明改动要点。
+
+- `type` 取值：`feat`（新功能）/ `fix`（修复）/ `docs`（文档）/ `refactor`（重构）/
+  `chore`（构建、配置、依赖等杂项）
+- `scope` 用括号标注影响范围，如 `feat(tauri):`、`fix(asar):`、`docs(agents):`
+- 一次提交只做一件事，代码改动与文档改动分开提交
+- 示例：
+
+```
+feat(tauri): 安装器支持多语言自动识别与全部用户安装
+
+- 打包语言列表加入 SimpChinese / TradChinese，按系统语言自动匹配
+- installMode 改为 both，允许用户选择当前用户或所有用户安装
+```
+
 ## 注意事项
 
 - 写入 `Program Files` 需要管理员权限；脚本已实现 UAC 自动提权，GUI 沿用该逻辑
