@@ -35,6 +35,13 @@
     ],
     "resources": {
       "../../skins": "skins/"
+    },
+    "windows": {
+      "nsis": {
+        "languages": ["English", "SimpChinese", "TradChinese"],
+        "installMode": "both",
+        "displayLanguageSelector": false
+      }
     }
   }
 }
