@@ -1,0 +1,133 @@
+/* ============================================================
+ * 全透明皮肤 —— 主界面全透明, 弹层保持可读
+ * 所有页面/面板/卡片背景一律 transparent;
+ * 弹窗/菜单/tooltip/toast 例外: 恢复 ZCode 原色 50% + 磨砂模糊,
+ * 避免弹层与透明面板"两层透明叠加"导致内容看不见。
+ * ============================================================ */
+
+/* 窗口底也透明(覆盖液态玻璃皮肤的极光背景) */
+html,
+html.dark,
+body,
+html.dark body {
+  background: transparent !important;
+}
+
+/* 亮色主题基准色 */
+:root {
+  --color-background: transparent;
+  --color-background-alt: transparent;
+  --color-background-win-alt: transparent;
+  --color-header: transparent;
+  --color-panel: transparent;
+  --color-sidebar: transparent;
+  --color-card: transparent;
+  --color-card-selected: transparent;
+  --color-input: transparent;
+  --color-input-focused: transparent;
+  --color-surface: transparent;
+  --color-surface-hover: transparent;
+  --color-terminal-bg: transparent;
+  --color-hover: transparent;
+  --color-selected: transparent;
+
+  /* 弹层例外: 恢复原色 50%, 不与透明面板叠加, 可读性优先 */
+  --color-popover: color-mix(in oklab, white 50%, transparent);
+  --color-popover-header: color-mix(in oklab, #f8f8f8 50%, transparent);
+  --color-menu: color-mix(in oklab, white 50%, transparent);
+  --color-menu-hover: color-mix(in oklab, var(--color-neutral-100) 50%, transparent);
+  --color-toast: color-mix(in oklab, white 50%, transparent);
+  --color-tooltip: color-mix(in oklab, #f0f0f0 50%, transparent);
+}
+
+/* 暗色主题基准色 */
+.dark {
+  --color-background: transparent;
+  --color-background-alt: transparent;
+  --color-background-win-alt: transparent;
+  --color-header: transparent;
+  --color-panel: transparent;
+  --color-sidebar: transparent;
+  --color-card: transparent;
+  --color-card-selected: transparent;
+  --color-input: transparent;
+  --color-input-focused: transparent;
+  --color-surface: transparent;
+  --color-surface-hover: transparent;
+  --color-terminal-bg: transparent;
+  --color-hover: transparent;
+  --color-selected: transparent;
+
+  /* 弹层例外: 暗色原值 50% */
+  --color-popover: color-mix(in oklab, var(--color-neutral-800) 50%, transparent);
+  --color-popover-header: color-mix(in oklab, var(--color-neutral-700) 50%, transparent);
+  --color-menu: color-mix(in oklab, var(--color-neutral-950) 50%, transparent);
+  --color-menu-hover: color-mix(in oklab, var(--color-neutral-900) 50%, transparent);
+  --color-toast: color-mix(in oklab, var(--color-neutral-900) 50%, transparent);
+  --color-tooltip: color-mix(in oklab, var(--color-neutral-900) 50%, transparent);
+}
+
+/* bg-* 工具类兜底: 强制透明 + 去掉毛玻璃/投影 */
+.bg-background, .bg-panel, .bg-sidebar, .bg-header,
+.bg-card, .bg-input, .bg-surface, .bg-terminal-bg {
+  background-color: transparent !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+/* 弹层例外: 不强制透明, 走上面 50% 的 token;
+ * 叠加磨砂模糊 + 轻投影, 保证悬浮时可读。
+ * 覆盖四种写法: .bg-popover 及其 /95 /98 透明度变体、
+ * 任意值类 bg-[var(--color-popover|menu)](个别弹窗不走工具类) */
+.bg-popover, .bg-menu, .bg-tooltip, .bg-toast,
+.bg-popover\/95, .bg-popover\/98,
+.bg-\[var\(--color-popover\)\], .bg-\[var\(--color-menu\)\] {
+  -webkit-backdrop-filter: blur(8px) saturate(1.5) !important;
+  backdrop-filter: blur(8px) saturate(1.5) !important;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.24) !important;
+}
+
+/* 全屏弹层(购买页等)直接用 bg-background, 上面被强制透明后
+ * 主界面文字会透上来叠在一起; 单独给回 50% 原色 + 模糊。
+ * 选择器比 .bg-background 兜底更具体(双类), 不影响主界面。 */
+.fixed.bg-background {
+  background-color: color-mix(in oklab, var(--color-neutral-50) 50%, transparent) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+}
+.dark .fixed.bg-background {
+  background-color: color-mix(in oklab, var(--color-neutral-900) 50%, transparent) !important;
+}
+
+/* z-100 确认弹窗不走工具类, 直接 bg-[var(--color-surface)];
+ * 该 token 主界面大量使用须保持透明, 这里按类名单独给 50% 底色 */
+.bg-\[var\(--color-surface\)\] {
+  background-color: color-mix(in oklab, white 50%, transparent) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(1.5) !important;
+  backdrop-filter: blur(8px) saturate(1.5) !important;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.24) !important;
+}
+.dark .bg-\[var\(--color-surface\)\] {
+  background-color: color-mix(in oklab, var(--color-neutral-800) 50%, transparent) !important;
+}
+
+/* 失焦变灰修复: 窗口/分格失焦时前端会盖一层写死内联样式的
+ * [data-v4-pane-inactive-overlay] 遮罩(bg 为 color-mix(--color-background) 34%,
+ * 外加 brightness/saturate 滤镜), 内联样式优先级高于 token 覆盖,
+ * 且皮肤把 --color-background 设为 transparent 后 color-mix 可能整条失效
+ * 回落到不透明白。这里用 !important 把遮罩压成全透明并去掉滤镜,
+ * 保证后台时依然透明。 */
+[data-v4-pane-inactive-overlay] {
+  background-color: transparent !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* 少数直接写死的 Tailwind 字面色也一并透明, 保证测试彻底 */
+.bg-white, .bg-black,
+.bg-neutral-50, .bg-neutral-100, .bg-neutral-200, .bg-neutral-300,
+.bg-neutral-700, .bg-neutral-800, .bg-neutral-900, .bg-neutral-950,
+.bg-zinc-800, .bg-zinc-900, .bg-slate-800, .bg-slate-900 {
+  background-color: transparent !important;
+}

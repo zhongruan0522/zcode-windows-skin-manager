@@ -1,0 +1,57 @@
+name: Build GUI (Windows)
+
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+# 同一分支连续 push 时取消排队中的旧构建，只保留最新一次
+concurrency:
+  group: build-gui-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: gui/pnpm-lock.yaml
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: gui/src-tauri
+
+      - name: Install frontend dependencies
+        working-directory: gui
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Tauri app
+        working-directory: gui
+        run: pnpm tauri build
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: zcode-skin-manager-${{ github.ref_name }}-${{ github.run_number }}
+          path: gui/src-tauri/target/release/bundle/nsis/*.exe
+          retention-days: 1
+          if-no-files-found: error

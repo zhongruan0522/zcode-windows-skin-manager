@@ -1,0 +1,8 @@
+{
+  "name": "纯透明测试",
+  "author": "zhongruan",
+  "version": "0.1.0",
+  "targetVersion": "ZCode 桌面版（Electron）",
+  "preview": "preview.png",
+  "description": "验证注入链路的全透明皮肤, 面板只剩文字和边框悬空显示"
+}

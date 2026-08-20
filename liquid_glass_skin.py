@@ -30,6 +30,7 @@ import hashlib
 import json
 import os
 import random
+import re
 import shutil
 import struct
 import subprocess
@@ -41,7 +42,9 @@ BACKUP_SUFFIX = ".orig"
 
 HTML_RELPATH = "out/renderer/index.html"
 CSS_RELPATH = "out/renderer/assets/liquid-glass.css"
+MAIN_JS_RELPATH = "out/main/index.js"
 MARKER = "liquid-glass-skin"  # index.html 里的注入标记, 同时也是 css 文件名
+WINDOW_PATCH_MARK = "zsm-transparent-window"  # 主进程 JS 里的窗口补丁标记
 BLOCK_SIZE = 4194304  # asar integrity 分块大小 (4 MiB)
 
 # ============================================================
@@ -453,6 +456,31 @@ def inject_link(html_text):
     return html_text.replace("</head>", link + "</head>", 1)
 
 
+# 主进程窗口补丁: 把 Windows 主窗口的 backgroundMaterial:"acrylic" 换成
+# transparent:!0。acrylic 是系统级材质, 窗口失焦时 DWM 会把它整体回落成
+# 灰色(皮肤 CSS 无法覆盖); transparent 窗口底色全交给 CSS, 失焦不变色。
+# 目标片段(win32 分支, v3.8.1 主包实测):
+#   backgroundColor:"#00000000",titleBarStyle:"hidden",titleBarOverlay:{...},
+#   backgroundMaterial:"acrylic"
+# 用正则容掉 titleBarOverlay 的具体内容, 且限定 win32 三元分支内,
+# 避免误伤 darwin 分支的 vibrancy。
+WINDOW_PATCH_RE = re.compile(
+    r'(process\.platform==="win32"\?\{backgroundColor:"#00000000".{0,200}?)'
+    r'backgroundMaterial:"acrylic"',
+    re.DOTALL,
+)
+
+
+def patch_main_js_for_transparency(js_text):
+    """给主窗口开启真透明。已打过补丁则原样返回(幂等)。"""
+    if WINDOW_PATCH_MARK in js_text:
+        return None
+    patched, n = WINDOW_PATCH_RE.subn(r"\1transparent:!0,/*" + WINDOW_PATCH_MARK + "*/", js_text)
+    if n == 0:
+        return False  # 模式不匹配: ZCode 更新后代码变了, 放弃补丁(皮肤 CSS 仍生效)
+    return patched
+
+
 def cmd_install(args):
     target = os.path.abspath(args.target)
     asar = os.path.join(target, ASAR_REL)
@@ -477,12 +505,29 @@ def cmd_install(args):
     with open(backup, "rb") as f:
         header, data_start = parse_header(f)
         html_bytes = read_inner(f, header, data_start, HTML_RELPATH)
+        main_js_bytes = read_inner(f, header, data_start, MAIN_JS_RELPATH)
     if html_bytes is None:
         die(f"asar 中找不到 {HTML_RELPATH}")
     html_text = html_bytes.decode("utf-8")
     new_html = inject_link(html_text)
     if new_html is None:
         new_html = html_text  # 已注入过, 保留现有 <link>, 只重建 css 内容
+
+    replacements = {HTML_RELPATH: new_html.encode("utf-8")}
+    window_patched = False
+    if getattr(args, "transparent_window", False):
+        if main_js_bytes is None:
+            print(f"[!] asar 中找不到 {MAIN_JS_RELPATH}, 跳过窗口透明补丁")
+        else:
+            new_js = patch_main_js_for_transparency(main_js_bytes.decode("utf-8", "ignore"))
+            if new_js is None:
+                window_patched = True  # 幂等: 之前已打过
+            elif new_js is False:
+                print("[!] 未匹配到 acrylic 窗口片段(ZCode 更新后代码可能变了), 跳过窗口透明补丁;\n"
+                      "    失焦时窗口可能变灰, 其余皮肤效果不受影响。")
+            else:
+                replacements[MAIN_JS_RELPATH] = new_js.encode("utf-8")
+                window_patched = True
 
     css = SKIN_CSS
     if args.css_file:
@@ -493,10 +538,12 @@ def cmd_install(args):
     tmp = asar + ".lgtmp"
     build_patched_asar(
         backup, tmp,
-        replacements={HTML_RELPATH: new_html.encode("utf-8")},
+        replacements=replacements,
         additions={CSS_RELPATH: css.encode("utf-8")},
     )
     print("[3/5] 新包自检通过 (注入内容 + 抽样哈希校验)")
+    if getattr(args, "transparent_window", False):
+        print(f"     窗口透明补丁: {'已应用 (失焦不再变灰)' if window_patched else '未应用'}")
 
     try:
         os.replace(tmp, asar)
@@ -559,7 +606,12 @@ def elevate_self(args):
     if getattr(args, "elevated", False):
         die("当前已是管理员但仍无法写入, 请检查目录权限或杀毒软件。")
     script = os.path.abspath(__file__)
-    cmd = [sys.executable, script, args.command, "--target", os.path.abspath(args.target), "--elevated"]
+    cmd = [sys.executable, script, args.command, "--target", os.path.abspath(args.target)]
+    if getattr(args, "css_file", None):
+        cmd += ["--css-file", os.path.abspath(args.css_file)]
+    if getattr(args, "transparent_window", False):
+        cmd += ["--transparent-window"]
+    cmd.append("--elevated")
     print("目标目录需要管理员权限, 正在请求提权 (请在弹出的 UAC 窗口点“是”)...")
     ret = ctypes.windll.shell32.ShellExecuteW(
         None, "runas", sys.executable, subprocess.list2cmdline(cmd), None, 1)
@@ -580,6 +632,9 @@ def main():
     ap.add_argument("--target", default=DEFAULT_TARGET,
                     help=f"ZCode 安装目录 (默认 {DEFAULT_TARGET})")
     ap.add_argument("--css-file", help="使用自定义 CSS 文件替换内置皮肤")
+    ap.add_argument("--transparent-window", action="store_true",
+                    help="同时给主进程打补丁: 主窗口改用真透明替代系统 acrylic 材质"
+                         "(修复 Windows 下窗口失焦时整体变灰的问题)")
     ap.add_argument("--elevated", action="store_true", help=argparse.SUPPRESS)
     args = ap.parse_args()
 

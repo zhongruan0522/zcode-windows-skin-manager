@@ -1,0 +1,8 @@
+{
+  "name": "液态玻璃",
+  "author": "zhongruan",
+  "version": "0.1.0",
+  "targetVersion": "ZCode 桌面版（Electron）",
+  "preview": "preview.png",
+  "description": "毛玻璃 + 极光背景的半透明皮肤, 同时适配明暗两套主题"
+}
