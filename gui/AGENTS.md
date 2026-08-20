@@ -23,7 +23,9 @@
   新增字段两边同步改
 - 后端读皮肤目录：开发时经 `paths::builtin_skins_dir()` 从 exe 向上找仓库根 `skins/`，
   打包后读 exe 旁 `skins/`；用户皮肤目录固定为 `%APPDATA%\zcode-skin-manager\skins`
-- 提权方式：写入被拒时以 `runas` 拉起自身加 `--elevated` 参数后台执行，
-  子进程结果经临时 JSON 回传（见 `elevate.rs`），不要改成 shell 调 Python
+- 提权方式：启动时若非管理员，`elevate::relaunch_as_admin_if_needed` 以
+  `runas` 自动提权重启自身（双击桌面图标即弹 UAC，无需用户手动"以管理员身份运行"）；
+  写入仍被拒时以 `--elevated` 参数后台执行，子进程结果经临时 JSON 回传
+  （见 `elevate.rs`），不要改成 shell 调 Python
 - 命令均为 `#[tauri::command] async fn`，阻塞操作放
   `tauri::async_runtime::spawn_blocking`，避免卡住主线程
