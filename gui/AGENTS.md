@@ -15,14 +15,21 @@
 
 - `src-tauri/src/` 各模块与根目录 `liquid_glass_skin.py` 的功能块一一对应
   （asar / inject / skins / elevate / process / paths），移植时保持逻辑等价；
-  `tray.rs` 为 GUI 附加模块（Python 版没有对应物）
+  `tray.rs` 为 GUI 附加模块（Python 版没有对应物）；
+  `import.rs` 为 GUI 附加模块（ZIP 皮肤包导入，结构校验 + 解压到用户皮肤目录）
 - 系统托盘（`tray.rs`）：关闭主窗口只隐藏到托盘继续驻留，托盘菜单"退出"才真正退出；
   左键托盘图标唤起主窗口，右键菜单含 GitHub / 建议反馈（ShellExecuteW 开浏览器，
   链接写死在 tray.rs，改仓库地址时同步改）
 - Rust DTO 一律 `#[serde(rename_all = "camelCase")]`，与 `src/lib/api.ts` 的 TS 类型对齐；
   新增字段两边同步改
 - 后端读皮肤目录：开发时经 `paths::builtin_skins_dir()` 从 exe 向上找仓库根 `skins/`，
-  打包后读 exe 旁 `skins/`；用户皮肤目录固定为 `%APPDATA%\zcode-skin-manager\skins`
+  打包后读 exe 旁 `skins/`；用户皮肤目录固定为 `~/.zcode-skins/skins`
+  （管理器数据统一在 `~/.zcode-skins/`，首次使用自动创建并迁移旧版
+  `%APPDATA%\zcode-skin-manager` 数据）
+- ZIP 导入（`import.rs` + 前端「导入 ZIP」按钮）：文件选择用
+  `tauri-plugin-dialog`（capabilities 已配 `dialog:default`），解压用 `zip` crate；
+  仅接受 `skins/<皮肤目录>/...` 或 `<名称>/skins/<皮肤目录>/...` 两种布局，
+  同名皮肤整体覆盖，任一校验失败整包拒绝不留半成品
 - 提权方式：启动时若非管理员，`elevate::relaunch_as_admin_if_needed` 以
   `runas` 自动提权重启自身（双击桌面图标即弹 UAC，无需用户手动"以管理员身份运行"）；
   写入仍被拒时以 `--elevated` 参数后台执行，子进程结果经临时 JSON 回传

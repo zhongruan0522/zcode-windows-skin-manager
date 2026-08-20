@@ -28,6 +28,7 @@ gui/
       ├─ asar.rs             # asar 读写 + integrity 重算（从 py 移植）
       ├─ inject.rs           # install / restore / status 流程编排
       ├─ skins.rs            # 扫描皮肤目录、校验 skin.json
+      ├─ import.rs           # ZIP 皮肤包导入（GUI 新增，py 无对应物）
       ├─ elevate.rs          # UAC 提权
       ├─ process.rs          # ZCode 进程检测
       └─ paths.rs            # 安装目录解析（注册表/常见位置/进程自动检测）+ 皮肤目录
@@ -36,10 +37,20 @@ gui/
 结构约定：
 
 - Rust 模块与 `liquid_glass_skin.py` 中的功能块一一对应，移植时逐块搬、逐块验证
+  （`import.rs` 为 GUI 新增的 ZIP 导入模块，Python 版无对应物）
 - 开发时后端读仓库根目录 `../skins`，打包时经 `tauri.conf.json` 的
   `resources` 随应用分发
-- 运行时另设用户皮肤目录 `%APPDATA%\zcode-skin-manager\skins`，
-  `paths.rs` 合并"内置 + 用户"两个来源，同名时用户目录优先
+- 管理器数据统一存放在 `~/.zcode-skins/`（`%USERPROFILE%\.zcode-skins`，
+  首次使用自动创建；旧版 `%APPDATA%\zcode-skin-manager` 数据自动迁入）：
+  - `~/.zcode-skins/settings.json` — 设置
+  - `~/.zcode-skins/skins/` — 用户皮肤目录（GUI「导入 ZIP」写入处），
+    `paths.rs` 合并"内置 + 用户"两个来源，同名时用户目录优先
+- ZIP 导入格式（`import.rs` 校验，两种布局整包一致、不可混用）：
+
+  ```
+  skins/<皮肤目录>/{skin.json, skin.css, ...}          # 布局一
+  <名称>/skins/<皮肤目录>/{skin.json, skin.css, ...}    # 布局二
+  ```
 - GUI 代码多起来后可在 `gui/` 内嵌套一份 AGENTS.md 放前端/Rust 的构建命令，
   根目录这份只管项目级约定
 
