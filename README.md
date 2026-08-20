@@ -20,13 +20,14 @@
 
 - ZCode
 - CodeBuddy
+- Trae
 
 ### 当前使用的 AI 模型
 
-- Zhipu/GLM-5.2[Max]
-- Zhipu/GLM-5.3[Max]
-- Zhipu/GLM-5V-Turbo[Thinking]
+- ZhipuCodingPlan/GLM-5.2[Max]
+- ZhipuCodingPlan/GLM-5.3[Max]
+- ZhipuCodingPlan/GLM-5V-Turbo[Thinking]
 
-> 在本项目开发完善期间，有部分模型仅使用本项目进行能力测试，并非主力开发，清单如下: `DeepSeek-V4-Flash`
+> 在本项目开发完善期间，有部分模型仅使用本项目进行能力测试，并非主力开发，清单如下: `CodeBuddy/DeepSeek-V4-Flash[max]`
 
 </details>
