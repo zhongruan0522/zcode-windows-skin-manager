@@ -396,6 +396,37 @@ body {
   padding-top: 10px;
 }
 
+/* ---------- ZCode 运行确认弹窗 ---------- */
+.dialog-mask {
+  z-index: 200;
+}
+
+.dialog {
+  width: min(440px, calc(100vw - 64px));
+}
+
+.dialog-body {
+  padding: 18px 20px;
+}
+
+.dialog-body p {
+  margin: 0;
+  font-size: 13.5px;
+}
+
+.dialog-warn {
+  margin-top: 10px;
+  color: var(--danger);
+}
+
+.dialog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+}
+
 /* ---------- 状态栏 ---------- */
 .status-bar {
   flex: none;

@@ -4,6 +4,7 @@ import SkinList from "./views/SkinList";
 import SettingsView from "./views/Settings";
 import StatusBar from "./components/StatusBar";
 import PreviewModal from "./components/PreviewModal";
+import ZCodeRunningDialog from "./components/ZCodeRunningDialog";
 
 type View = "skins" | "settings";
 
@@ -17,6 +18,12 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   /** 详情弹窗: "official" 或皮肤 id */
   const [detailId, setDetailId] = useState<string | null>(null);
+  /** 待确认的操作(应用/恢复): ZCode 运行中, 等用户退出后在弹窗里确认 */
+  const [confirmPending, setConfirmPending] = useState<BusyAction | null>(null);
+  /** 弹窗内点「已关闭」后的复查状态 */
+  const [confirmChecking, setConfirmChecking] = useState(false);
+  /** 复查后仍检测到 ZCode 在运行 */
+  const [stillRunning, setStillRunning] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -31,40 +38,86 @@ export default function App() {
     })();
   }, []);
 
-  const runAction = useCallback(
-    async (action: BusyAction, fn: () => Promise<void>) => {
+  const runAction = useCallback(async (action: BusyAction) => {
+    setBusy(action);
+    setError(null);
+    setMessage(null);
+    try {
+      const out =
+        action.kind === "install"
+          ? await api.installSkin(action.id)
+          : await api.restoreSkin();
+      setMessage(out.message);
+      setStatus(out.status);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(null);
+    }
+  }, []);
+
+  /** 应用/恢复前的守卫: 实时检测 ZCode 是否在运行, 运行中弹窗让用户退出后确认 */
+  const guardAction = useCallback(
+    async (action: BusyAction) => {
       setBusy(action);
       setError(null);
       setMessage(null);
       try {
-        await fn();
+        if (await api.zcodeRunning()) {
+          setStillRunning(false);
+          setConfirmPending(action);
+          return; // busy 保持, 弹窗期间锁定界面
+        }
+        await runAction(action);
       } catch (e) {
-        setError(String(e));
-      } finally {
         setBusy(null);
+        setError(String(e));
       }
-    },
-    []
-  );
-
-  const handleApply = useCallback(
-    (id: string) => {
-      void runAction({ kind: "install", id }, async () => {
-        const out = await api.installSkin(id);
-        setMessage(out.message);
-        setStatus(out.status);
-      });
     },
     [runAction]
   );
 
+  const handleApply = useCallback(
+    (id: string) => {
+      void guardAction({ kind: "install", id });
+    },
+    [guardAction]
+  );
+
   const handleRestore = useCallback(() => {
-    void runAction({ kind: "restore", id: "official" }, async () => {
-      const out = await api.restoreSkin();
-      setMessage(out.message);
-      setStatus(out.status);
-    });
-  }, [runAction]);
+    void guardAction({ kind: "restore", id: "official" });
+  }, [guardAction]);
+
+  /** 确认弹窗「取消」: 放弃本次操作 */
+  const handleConfirmCancel = useCallback(() => {
+    setConfirmPending(null);
+    setStillRunning(false);
+    setBusy(null);
+  }, []);
+
+  /** 确认弹窗「已关闭」: 复查进程, 确已退出则继续执行原操作 */
+  const handleConfirmClosed = useCallback(() => {
+    if (!confirmPending) return;
+    const action = confirmPending;
+    setConfirmChecking(true);
+    void (async () => {
+      try {
+        if (await api.zcodeRunning()) {
+          setStillRunning(true);
+          return;
+        }
+        setConfirmPending(null);
+        setStillRunning(false);
+        await runAction(action);
+      } catch (e) {
+        setError(String(e));
+        setConfirmPending(null);
+        setBusy(null);
+      } finally {
+        setConfirmChecking(false);
+      }
+    })();
+  }, [confirmPending, runAction]);
 
   const handleSaveSettings = useCallback(async (dir: string) => {
     setTargetDir(dir);
@@ -150,6 +203,20 @@ export default function App() {
           onApply={handleApply}
           onRestore={handleRestore}
           onClose={() => setDetailId(null)}
+        />
+      )}
+
+      {confirmPending && (
+        <ZCodeRunningDialog
+          actionLabel={
+            confirmPending.kind === "install"
+              ? skins.find((s) => s.id === confirmPending.id)?.name ?? confirmPending.id
+              : "恢复原版"
+          }
+          stillRunning={stillRunning}
+          checking={confirmChecking}
+          onCancel={handleConfirmCancel}
+          onConfirmClosed={handleConfirmClosed}
         />
       )}
     </div>

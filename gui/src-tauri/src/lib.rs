@@ -141,6 +141,15 @@ async fn restore_skin(target: Option<String>) -> Result<ActionOutcome, String> {
     Ok(ActionOutcome { message, status })
 }
 
+/// 应用/恢复前实时检测目标目录下的 ZCode 是否在运行(轻量, 不解析 asar)
+#[tauri::command]
+async fn zcode_running(target: Option<String>) -> Result<bool, String> {
+    let t = target_from(target);
+    tauri::async_runtime::spawn_blocking(move || process::zcode_running_under(&t))
+        .await
+        .map_err(|e| e.to_string())
+}
+
 pub fn run() {
     // 提权子进程模式: 无 GUI, 只执行 install/restore 后退出
     if let Some(code) = elevate::maybe_run_elevated_cli() {
@@ -172,7 +181,8 @@ pub fn run() {
             save_settings,
             detect_installs,
             install_skin,
-            restore_skin
+            restore_skin,
+            zcode_running
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
