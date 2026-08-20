@@ -4,15 +4,29 @@
 use std::path::Path;
 use std::process::Command;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+/// CREATE_NO_WINDOW: 子进程不分配新的控制台窗口, 避免 PowerShell 一闪而过
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// 构造一个不弹黑窗的 PowerShell 调用, 输出运行中的 ZCode.exe 路径。
+/// process.rs / paths.rs 共用同一查询, 避免命令字符串重复散落。
+pub(crate) fn powershell_zcode_paths() -> Command {
+    let mut cmd = Command::new("powershell");
+    cmd.args([
+        "-NoProfile",
+        "-Command",
+        "(Get-Process ZCode -ErrorAction SilentlyContinue).Path",
+    ]);
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
 pub fn zcode_running_under(target_dir: &Path) -> bool {
-    let Ok(out) = Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-Command",
-            "(Get-Process ZCode -ErrorAction SilentlyContinue).Path",
-        ])
-        .output()
-    else {
+    let Ok(out) = powershell_zcode_paths().output() else {
         return false;
     };
     if !out.status.success() {

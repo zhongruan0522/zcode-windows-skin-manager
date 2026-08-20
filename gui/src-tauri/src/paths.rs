@@ -158,14 +158,8 @@ fn common_install_dirs() -> Vec<PathBuf> {
 
 /// 运行中的 ZCode 进程所在目录(与 process.rs 同款 PowerShell 查询)
 fn running_process_dirs() -> Vec<PathBuf> {
-    let Ok(out) = std::process::Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-Command",
-            "(Get-Process ZCode -ErrorAction SilentlyContinue).Path",
-        ])
-        .output()
-    else {
+    // 复用 process::powershell_zcode_paths, 已加 CREATE_NO_WINDOW 不弹黑窗
+    let Ok(out) = process::powershell_zcode_paths().output() else {
         return Vec::new();
     };
     String::from_utf8_lossy(&out.stdout)

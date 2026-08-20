@@ -198,6 +198,13 @@ pub fn restore_flow(target: &Path) -> Result<String, FlowError> {
 }
 
 /// 查询注入状态。asar 损坏等异常按"未安装"处理, 不报错。
+///
+/// 注意: 这里**不再**调 `process::zcode_running_under`。
+/// 启动 / 刷新状态时若拉 PowerShell 会闪一个黑色控制台窗口, 影响体验;
+/// 而应用 / 还原流程内部(`install_flow` / `restore_flow`)和前端守卫
+/// (`api.zcodeRunning`) 已经各自做过运行检测, 此处无需再查。
+/// 因此 `zcode_running` 字段恒为 `false`, StatusBar 的"运行中"提示
+/// 改由前端按需调用 `zcode_running` 命令刷新。
 pub fn status(target: &Path) -> StatusInfo {
     let asar = asar_path(target);
     let mut info = StatusInfo {
@@ -206,7 +213,7 @@ pub fn status(target: &Path) -> StatusInfo {
         has_backup: backup_path(target).is_file(),
         installed_skin_id: None,
         installed_skin_name: None,
-        zcode_running: process::zcode_running_under(target),
+        zcode_running: false,
         is_elevated: crate::elevate::is_admin(),
     };
     if !info.asar_exists {
