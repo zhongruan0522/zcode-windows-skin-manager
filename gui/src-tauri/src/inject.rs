@@ -70,6 +70,30 @@ fn is_denied(e: &std::io::Error) -> bool {
     e.kind() == std::io::ErrorKind::PermissionDenied || e.raw_os_error() == Some(5)
 }
 
+/// ERROR_SHARING_VIOLATION: 文件被其他进程占用(如未完全退出的 ZCode)
+fn is_locked(e: &std::io::Error) -> bool {
+    e.raw_os_error() == Some(32)
+}
+
+/// 归类写入被拒的 IO 错误:
+/// - 文件被占用(共享冲突): 提权也无效, 直接报可读错误;
+/// - 普通拒绝: 未提权时走 UAC 重试; 但当前已是管理员仍被拒, 说明多半
+///   不是权限问题, 而是 app.asar 被运行中的 ZCode / 安全软件锁定。
+fn denied_flow_error(action: &str, e: &std::io::Error) -> FlowError {
+    if is_locked(e) {
+        return FlowError::Fatal(format!(
+            "{action}失败: 文件正被其他进程占用(通常是未完全退出的 ZCode), 请完全退出 ZCode 后重试。"
+        ));
+    }
+    if crate::elevate::is_admin() {
+        FlowError::Fatal(format!(
+            "{action}失败: 拒绝访问({e})。当前已是管理员权限, 文件可能被运行中的 ZCode 或安全软件占用, 请完全退出 ZCode 后重试。"
+        ))
+    } else {
+        FlowError::NeedElevate(action.into())
+    }
+}
+
 /// 在 </head> 前插入皮肤 <link>; 已注入过(含标记)则原样返回, 幂等
 pub fn inject_link(html: &str) -> Result<String, String> {
     if html.contains(MARKER) {
@@ -129,10 +153,8 @@ pub fn install_flow(target: &Path, skin_id: &str) -> Result<String, FlowError> {
     if !backup.is_file() {
         match fs::copy(&asar, &backup) {
             Ok(_) => {}
-            Err(e) if is_denied(&e) => {
-                return Err(FlowError::NeedElevate(
-                    "备份官方 app.asar 需要管理员权限".into(),
-                ))
+            Err(e) if is_denied(&e) || is_locked(&e) => {
+                return Err(denied_flow_error("备份官方 app.asar", &e));
             }
             Err(e) => return Err(FlowError::Fatal(format!("备份失败: {e}"))),
         }
@@ -156,11 +178,9 @@ pub fn install_flow(target: &Path, skin_id: &str) -> Result<String, FlowError> {
     }
     match fs::rename(&tmp, &asar) {
         Ok(_) => {}
-        Err(e) if is_denied(&e) => {
+        Err(e) if is_denied(&e) || is_locked(&e) => {
             let _ = fs::remove_file(&tmp);
-            return Err(FlowError::NeedElevate(
-                "写回 app.asar 需要管理员权限".into(),
-            ));
+            return Err(denied_flow_error("写回 app.asar", &e));
         }
         Err(e) => {
             let _ = fs::remove_file(&tmp);
@@ -187,9 +207,7 @@ pub fn restore_flow(target: &Path) -> Result<String, FlowError> {
     }
     match fs::rename(&backup, &asar) {
         Ok(_) => Ok("已还原官方皮肤。".into()),
-        Err(e) if is_denied(&e) => Err(FlowError::NeedElevate(
-            "还原 app.asar 需要管理员权限".into(),
-        )),
+        Err(e) if is_denied(&e) || is_locked(&e) => Err(denied_flow_error("还原 app.asar", &e)),
         Err(e) => Err(FlowError::Fatal(format!("还原失败: {e}"))),
     }
 }

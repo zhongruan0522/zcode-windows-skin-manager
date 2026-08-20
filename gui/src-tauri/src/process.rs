@@ -34,11 +34,23 @@ pub fn zcode_running_under(target_dir: &Path) -> bool {
         return false;
     }
     let stdout = String::from_utf8_lossy(&out.stdout);
-    let target = normalize_dir(target_dir);
-    stdout.lines().any(|line| {
-        let line = line.trim();
-        !line.is_empty() && normalize_str(&parent_of(line)).starts_with(&target)
-    })
+    stdout
+        .lines()
+        .any(|line| exe_path_matches_target(line.trim(), target_dir))
+}
+
+/// PowerShell 输出的一行进程 exe 路径是否位于目标目录下。
+/// ZCode.exe 标准布局就安装在目标目录**根部**, exe 父目录与目标目录
+/// 完全相等, 必须判等命中; 只比 `dir\` 前缀会漏掉这种最常见的情况
+/// (曾经的 bug: 检测永远不命中, 导致 ZCode 运行中照样写回 asar)。
+fn exe_path_matches_target(exe_path: &str, target_dir: &Path) -> bool {
+    if exe_path.is_empty() {
+        return false;
+    }
+    let dir = normalize_str(&parent_of(exe_path));
+    let target = normalize_dir(target_dir); // 尾部带 '\'
+    let target_root = target.trim_end_matches('\\');
+    dir == target_root || dir.starts_with(&target)
 }
 
 fn parent_of(path: &str) -> String {
@@ -95,5 +107,27 @@ mod tests {
         // 该目录下没有 ZCode.exe, 必然不算运行
         assert!(!zcode_running_under(&dir));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn exe_path_matches_target_root_subdir_and_rejects_other_dir() {
+        let dir = crate::asar::temp_root("process-match");
+        let exe = dir.join("ZCode.exe");
+        std::fs::write(&exe, b"x").unwrap();
+        // 回归: 标准布局 exe 直接位于目标目录根部, 必须命中
+        // (旧实现只比 "dir\" 前缀, 相等目录永远不命中)
+        assert!(exe_path_matches_target(&exe.to_string_lossy(), &dir));
+        // 子目录里的实例同样算目标目录下的进程
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        let sub = dir.join("sub").join("ZCode.exe");
+        std::fs::write(&sub, b"x").unwrap();
+        assert!(exe_path_matches_target(&sub.to_string_lossy(), &dir));
+        // 其他目录的实例不算
+        let other = crate::asar::temp_root("process-other");
+        let other_exe = other.join("ZCode.exe");
+        std::fs::write(&other_exe, b"x").unwrap();
+        assert!(!exe_path_matches_target(&other_exe.to_string_lossy(), &dir));
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&other);
     }
 }
